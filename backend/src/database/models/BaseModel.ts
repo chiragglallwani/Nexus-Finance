@@ -25,10 +25,11 @@ class BaseModel extends Model {
           return this.init(
                {
                     tenant_id: {
-                         type: DataTypes.STRING,
+                         type: DataTypes.UUID,
                          allowNull: true,
                          references: {
                               model: "tenants",
+                              key: "tenant_id",
                          },
                          field: "tenant_id",
                     },

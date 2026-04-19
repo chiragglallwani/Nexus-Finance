@@ -49,7 +49,7 @@ class Tenants extends Model {
                },
                {
                     sequelize,
-                    tableName: "tenant_profiles",
+                    tableName: "tenants",
                     schema: "nexus_finance",
                     timestamps: true,
                     paranoid: true,
@@ -59,6 +59,11 @@ class Tenants extends Model {
      }
 
      static associate(models: Record<string, ModelStatic<Model>>) {
+          Tenants.hasMany(models.Users!, {
+               foreignKey: "tenant_id",
+               sourceKey: "tenant_id",
+               constraints: true,
+          });
           Tenants.hasMany(models.BaseModel!, {
                foreignKey: "tenant_id",
                sourceKey: "tenant_id",

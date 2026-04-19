@@ -2,6 +2,7 @@ import { Sequelize } from "sequelize";
 import logger from "../config/logger";
 import migrationService from "./migration.service";
 import Tenants from "../database/models/Tenants";
+import Users from "../database/models/Users";
 import BaseModel from "../database/models/BaseModel";
 
 class DatabaseService {
@@ -54,8 +55,11 @@ class DatabaseService {
 
      async registerModels(connection: Sequelize) {
           Tenants.initModel(connection);
+          Users.initModel(connection);
           BaseModel.initWithTenant({}, { sequelize: connection });
-          // todo: link all the models here
+          const models = { Tenants, Users, BaseModel };
+          Tenants.associate(models);
+          Users.associate(models);
      }
 
      async cleanup() {
