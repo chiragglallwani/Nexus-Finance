@@ -3,6 +3,11 @@ import logger from "../config/logger";
 import migrationService from "./migration.service";
 import Tenants from "../database/models/Tenants";
 import Users from "../database/models/Users";
+import IndividualTransactions from "../database/models/IndividualTransactions";
+import BusinessTransactions from "../database/models/BusinessTransactions";
+import Vaults from "../database/models/Vaults";
+import TenantBalance from "../database/models/TenantBalance";
+import TenantInvoices from "../database/models/TenantInvoices";
 import BaseModel from "../database/models/BaseModel";
 
 class DatabaseService {
@@ -56,10 +61,30 @@ class DatabaseService {
      async registerModels(connection: Sequelize) {
           Tenants.initModel(connection);
           Users.initModel(connection);
+          IndividualTransactions.initModel(connection);
+          BusinessTransactions.initModel(connection);
+          Vaults.initModel(connection);
+          TenantBalance.initModel(connection);
+          TenantInvoices.initModel(connection);
           BaseModel.initWithTenant({}, { sequelize: connection });
-          const models = { Tenants, Users, BaseModel };
+
+          const models = {
+               Tenants,
+               Users,
+               IndividualTransactions,
+               BusinessTransactions,
+               Vaults,
+               TenantBalance,
+               TenantInvoices,
+               BaseModel,
+          };
           Tenants.associate(models);
           Users.associate(models);
+          IndividualTransactions.associate(models);
+          BusinessTransactions.associate(models);
+          Vaults.associate(models);
+          TenantBalance.associate(models);
+          TenantInvoices.associate(models);
      }
 
      async cleanup() {

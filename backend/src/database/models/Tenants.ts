@@ -64,10 +64,30 @@ class Tenants extends Model {
                sourceKey: "tenant_id",
                constraints: true,
           });
-          Tenants.hasMany(models.BaseModel!, {
+          Tenants.hasMany(models.IndividualTransactions!, {
                foreignKey: "tenant_id",
                sourceKey: "tenant_id",
-               constraints: false,
+               constraints: true,
+          });
+          Tenants.hasMany(models.BusinessTransactions!, {
+               foreignKey: "tenant_id",
+               sourceKey: "tenant_id",
+               constraints: true,
+          });
+          Tenants.hasMany(models.Vaults!, {
+               foreignKey: "tenant_id",
+               sourceKey: "tenant_id",
+               constraints: true,
+          });
+          Tenants.hasMany(models.TenantBalance!, {
+               foreignKey: "tenant_id",
+               sourceKey: "tenant_id",
+               constraints: true,
+          });
+          Tenants.hasMany(models.TenantInvoices!, {
+               foreignKey: "tenant_id",
+               sourceKey: "tenant_id",
+               constraints: true,
           });
      }
 }

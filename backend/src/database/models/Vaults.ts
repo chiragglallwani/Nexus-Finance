@@ -1,37 +1,42 @@
 import { DataTypes, type ModelStatic, type Sequelize } from "sequelize";
 import BaseModel from "./BaseModel";
 
-class Users extends BaseModel {
-     declare user_id: string;
-     declare email: string;
+class Vaults extends BaseModel {
+     declare vault_id: string;
      declare name: string;
-     declare password: string;
+     declare target_amount: number;
+     declare deadline_date: Date;
+     declare priority: number;
 
      static initModel(sequelize: Sequelize) {
-          return Users.initWithTenant(
+          return Vaults.initWithTenant(
                {
-                    user_id: {
+                    vault_id: {
                          type: DataTypes.UUID,
                          defaultValue: DataTypes.UUIDV4,
                          primaryKey: true,
                          allowNull: false,
                     },
-                    email: {
-                         type: DataTypes.STRING(255),
-                         allowNull: false,
-                    },
                     name: {
-                         type: DataTypes.STRING(255),
+                         type: DataTypes.STRING(100),
                          allowNull: false,
                     },
-                    password: {
-                         type: DataTypes.STRING(255),
+                    target_amount: {
+                         type: DataTypes.DECIMAL(12, 2),
+                         allowNull: false,
+                    },
+                    deadline_date: {
+                         type: DataTypes.DATEONLY,
+                         allowNull: false,
+                    },
+                    priority: {
+                         type: DataTypes.INTEGER,
                          allowNull: false,
                     },
                },
                {
                     sequelize,
-                    tableName: "users",
+                    tableName: "vaults",
                     schema: "nexus_finance",
                     underscored: true,
                },
@@ -39,22 +44,17 @@ class Users extends BaseModel {
      }
 
      static associate(models: Record<string, ModelStatic<BaseModel>>) {
-          Users.belongsTo(models.Tenants!, {
+          Vaults.belongsTo(models.Tenants!, {
                foreignKey: "tenant_id",
                targetKey: "tenant_id",
                constraints: true,
           });
-          Users.hasMany(models.BusinessTransactions!, {
-               foreignKey: "user_id",
-               sourceKey: "user_id",
-               constraints: true,
-          });
-          Users.hasMany(models.TenantInvoices!, {
-               foreignKey: "user_id",
-               sourceKey: "user_id",
+          Vaults.hasMany(models.IndividualTransactions!, {
+               foreignKey: "vault_id",
+               sourceKey: "vault_id",
                constraints: true,
           });
      }
 }
 
-export default Users;
+export default Vaults;
