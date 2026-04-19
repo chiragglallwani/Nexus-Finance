@@ -21,3 +21,12 @@ export const setAsyncStorage = <T>(data: T) => {
 export const getAsyncStorage = () => {
      return asyncStorage.getStore();
 };
+
+export const getTenantId = async () => {
+     const store = getAsyncStorage() as { tenantId: string };
+     const tenantId = store.tenantId;
+     if (tenantId) {
+          return tenantId;
+     }
+     throw new Error("Tenant ID not found");
+};
