@@ -1,6 +1,8 @@
 import { Sequelize } from "sequelize";
 import logger from "../config/logger";
 import migrationService from "./migration.service";
+import Tenants from "../database/models/Tenants";
+import BaseModel from "../database/models/BaseModel";
 
 class DatabaseService {
      private nexusFinanceSchemaConnection: Sequelize | null = null;
@@ -50,9 +52,16 @@ class DatabaseService {
           }
      }
 
-     // eslint-disable-next-line @typescript-eslint/no-unused-vars
      async registerModels(connection: Sequelize) {
-          // todo: link the models and associations here
+          Tenants.initModel(connection);
+          BaseModel.initWithTenant({}, { sequelize: connection });
+          // todo: link all the models here
+     }
+
+     async cleanup() {
+          if (this.nexusFinanceSchemaConnection) {
+               await this.nexusFinanceSchemaConnection.close();
+          }
      }
 }
 
