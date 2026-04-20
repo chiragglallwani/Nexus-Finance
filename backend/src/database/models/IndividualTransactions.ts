@@ -1,6 +1,11 @@
 import { DataTypes, type ModelStatic, type Sequelize } from "sequelize";
 import BaseModel from "./BaseModel";
 
+enum TransactionType {
+     INFLOW = "INFLOW",
+     OUTFLOW = "OUTFLOW",
+}
+
 class IndividualTransactions extends BaseModel {
      declare id: string;
      declare merchant_name: string;
@@ -8,6 +13,7 @@ class IndividualTransactions extends BaseModel {
      declare amount: number;
      declare date: Date;
      declare category: string | null;
+     declare transaction_type: TransactionType | null;
      declare is_recurring: boolean;
      declare prev_amount: number | null;
      declare price_creep_pct: number | null;
@@ -65,6 +71,10 @@ class IndividualTransactions extends BaseModel {
                          type: DataTypes.INTEGER,
                          allowNull: true,
                     },
+                    transaction_type: {
+                         type: DataTypes.ENUM(...Object.values(TransactionType)),
+                         allowNull: true,
+                    },
                     vault_id: {
                          type: DataTypes.UUID,
                          allowNull: true,
@@ -93,4 +103,5 @@ class IndividualTransactions extends BaseModel {
      }
 }
 
+export { TransactionType };
 export default IndividualTransactions;

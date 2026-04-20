@@ -1,5 +1,6 @@
 import { DataTypes, type ModelStatic, type Sequelize } from "sequelize";
 import BaseModel from "./BaseModel";
+import { TransactionType } from "./IndividualTransactions";
 
 class BusinessTransactions extends BaseModel {
      declare business_transactions_id: string;
@@ -8,6 +9,7 @@ class BusinessTransactions extends BaseModel {
      declare amount: number;
      declare date: Date;
      declare category: string | null;
+     declare transaction_type: TransactionType | null;
      declare account_source: string | null;
      declare tax_reserved: number | null;
      declare is_deductible: boolean;
@@ -73,6 +75,10 @@ class BusinessTransactions extends BaseModel {
                               model: "tenant_invoices",
                               key: "tenant_invoices_id",
                          },
+                    },
+                    transaction_type: {
+                         type: DataTypes.ENUM(...Object.values(TransactionType)),
+                         allowNull: true,
                     },
                     days_to_pay: {
                          type: DataTypes.INTEGER,
