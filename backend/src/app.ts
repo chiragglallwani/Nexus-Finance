@@ -12,6 +12,7 @@ import { asyncStorageMiddleware } from "./utils/asyncStorage";
 import { requestLogger } from "./middleware/logging/requestLogger";
 import { authMiddleware, csrfProtection } from "./middleware/auth/authMiddleware";
 import { startTransactionWorker } from "./workers/transaction.worker";
+import authRoutes from "./routes/auth/auth.route";
 
 dotenv.config({ path: `.env.${process.env.NODE_ENV || "local"}` });
 
@@ -58,6 +59,8 @@ app.use(requestLogger);
 app.get("/health", (_req, res) => {
      res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+app.use("/api/v1/auth", authRoutes);
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function mountValidationRoutes(
