@@ -10,7 +10,6 @@ import databaseService from "./services/database.service";
 import eventService from "./events/event.service";
 import { asyncStorageMiddleware } from "./utils/asyncStorage";
 import { requestLogger } from "./middleware/logging/requestLogger";
-import { tenantIsolation } from "./middleware/auth/tenantIsolation";
 
 dotenv.config({ path: `.env.${process.env.NODE_ENV || "local"}` });
 
@@ -58,7 +57,6 @@ app.get("/health", (_req, res) => {
 
 // --- Protected routes go below this line ---
 // Apply tenant isolation to all /api/* routes
-app.use("/api", tenantIsolation);
 
 // Placeholder routers — wire actual routers here:
 // app.use("/api/transactions", transactionRouter);
