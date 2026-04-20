@@ -24,9 +24,24 @@ export const getAsyncStorage = () => {
 
 export const getTenantId = async () => {
      const store = getAsyncStorage() as { tenantId: string };
-     const tenantId = store.tenantId;
+     const tenantId = store?.tenantId;
      if (tenantId) {
           return tenantId;
      }
      throw new Error("Tenant ID not found");
 };
+
+/**
+ * Runs a function within a tenant-scoped AsyncLocalStorage context.
+ * Used by BullMQ workers and other non-Express code paths so that
+ * BaseModel hooks (beforeCreate, beforeBulkCreate, etc.) can resolve
+ * the tenant ID without an HTTP request.
+ */
+export async function runWithTenantContext<T>(
+     tenantId: string,
+     fn: () => Promise<T>,
+): Promise<T> {
+     const store = new Map();
+     (store as unknown as Record<string, string>).tenantId = tenantId;
+     return asyncStorage.run(store, fn);
+}

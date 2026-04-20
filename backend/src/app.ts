@@ -1,4 +1,4 @@
-import express from "express";
+import express, { type RequestHandler } from "express";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import cors from "cors";
@@ -10,20 +10,25 @@ import databaseService from "./services/database.service";
 import eventService from "./events/event.service";
 import { asyncStorageMiddleware } from "./utils/asyncStorage";
 import { requestLogger } from "./middleware/logging/requestLogger";
+import { authMiddleware, csrfProtection } from "./middleware/auth/authMiddleware";
+import uploadRoutes from "./routes/imports/upload.routes";
+import { startTransactionWorker } from "./workers/transaction.worker";
 
 dotenv.config({ path: `.env.${process.env.NODE_ENV || "local"}` });
 
 const PORT = process.env.PORT;
 
-async function initializeDatabase() {
+async function initializeApp() {
      try {
           await migrationService.runSchemaMigrations();
           await databaseService.initializeNexusFinanceSchemaConnection();
           await migrationService.runSystemMigrations();
           logger.info("Database initialized completed");
+
+          startTransactionWorker();
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
      } catch (error: any) {
-          logger.error("Failed to initialize database", {
+          logger.error("Failed to initialize application", {
                error: error.message,
                stack: error.stack,
           });
@@ -31,12 +36,12 @@ async function initializeDatabase() {
      }
 }
 
-initializeDatabase();
+initializeApp();
 eventService.registerHandlers();
 
 const limiter = rateLimit({
-     windowMs: 5 * 60 * 1000, // 5 minutes
-     max: 100, // limit each IP to 100 requests per windowMs
+     windowMs: 5 * 60 * 1000,
+     max: 100,
      message: "Too many requests from this IP, please try again after 15 minutes",
 });
 
@@ -55,14 +60,13 @@ app.get("/health", (_req, res) => {
      res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// --- Protected routes go below this line ---
-// Apply tenant isolation to all /api/* routes
-
-// Placeholder routers — wire actual routers here:
-// app.use("/api/transactions", transactionRouter);
-// app.use("/api/individual", requireTenantType("INDIVIDUAL"), individualRouter);
-// app.use("/api/business", requireTenantType("BUSINESS"), businessRouter);
-// app.use("/api/jobs", jobsRouter);
+function mountValidationRoutes(
+     app: express.Application,
+     serviceName: string,
+     router: RequestHandler,
+) {
+     app.use(`/api/v1/${serviceName}`, csrfProtection, authMiddleware, router);
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
