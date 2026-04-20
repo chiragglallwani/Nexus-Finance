@@ -89,6 +89,11 @@ class Tenants extends Model {
                sourceKey: "tenant_id",
                constraints: true,
           });
+          Tenants.hasMany(models.Jobs!, {
+               foreignKey: "tenant_id",
+               sourceKey: "tenant_id",
+               constraints: true,
+          });
      }
 }
 

@@ -8,6 +8,7 @@ import BusinessTransactions from "../database/models/BusinessTransactions";
 import Vaults from "../database/models/Vaults";
 import TenantBalance from "../database/models/TenantBalance";
 import TenantInvoices from "../database/models/TenantInvoices";
+import Jobs from "../database/models/Jobs";
 import BaseModel from "../database/models/BaseModel";
 
 class DatabaseService {
@@ -66,6 +67,7 @@ class DatabaseService {
           Vaults.initModel(connection);
           TenantBalance.initModel(connection);
           TenantInvoices.initModel(connection);
+          Jobs.initModel(connection);
           BaseModel.initWithTenant({}, { sequelize: connection });
 
           const models = {
@@ -76,6 +78,7 @@ class DatabaseService {
                Vaults,
                TenantBalance,
                TenantInvoices,
+               Jobs,
                BaseModel,
           };
           Tenants.associate(models);
@@ -85,6 +88,7 @@ class DatabaseService {
           Vaults.associate(models);
           TenantBalance.associate(models);
           TenantInvoices.associate(models);
+          Jobs.associate(models);
      }
 
      async cleanup() {

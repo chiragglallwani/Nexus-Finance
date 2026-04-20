@@ -51,10 +51,21 @@ app.use(cookieParser());
 app.use(asyncStorageMiddleware);
 app.use(requestLogger);
 
-app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
+app.get("/health", (_req, res) => {
+     res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// --- Protected routes go below this line ---
+// Apply tenant isolation to all /api/* routes
+
+// Placeholder routers — wire actual routers here:
+// app.use("/api/transactions", transactionRouter);
+// app.use("/api/individual", requireTenantType("INDIVIDUAL"), individualRouter);
+// app.use("/api/business", requireTenantType("BUSINESS"), businessRouter);
+// app.use("/api/jobs", jobsRouter);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
      if (err.status === 429) {
           logger.warn(`Too many requests from ${req.ip}`, {
                url: req.originalUrl,
@@ -62,9 +73,21 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
                status: 429,
                message: "Too many requests",
           });
-          return res.status(429).json({ message: "Too many requests" });
+          res.status(429).json({ message: "Too many requests" });
+          return;
      }
-     next(err);
+     logger.error("Unhandled error", {
+          error: err.message || err,
+          stack: err.stack,
+          url: req.originalUrl,
+          method: req.method,
+     });
+     res.status(err.status || 500).json({
+          status: "failure",
+          message: process.env.NODE_ENV === "production" ? "Internal server error" : err.message,
+     });
 });
+
+app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
 
 export default app;
