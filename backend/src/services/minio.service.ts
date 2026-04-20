@@ -33,10 +33,7 @@ class MinioService {
           return { bucket, key, size: fileBuffer.length };
      }
 
-     async getFileStream(
-          bucket: string,
-          key: string,
-     ): Promise<Readable> {
+     async getFileStream(bucket: string, key: string): Promise<Readable> {
           const client = getMinioClient();
           return client.getObject(bucket, key);
      }

@@ -31,7 +31,8 @@ class BulkUploadService {
                throw new Error(`Job ${jobId} not found`);
           }
 
-          const alreadyProcessed = (jobResponse.data as { processedRows?: number }).processedRows || 0;
+          const alreadyProcessed =
+               (jobResponse.data as { processedRows?: number }).processedRows || 0;
 
           await runWithTenantContext(tenantId, async () => {
                await Jobs.update(

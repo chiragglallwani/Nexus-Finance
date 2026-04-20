@@ -11,7 +11,6 @@ import eventService from "./events/event.service";
 import { asyncStorageMiddleware } from "./utils/asyncStorage";
 import { requestLogger } from "./middleware/logging/requestLogger";
 import { authMiddleware, csrfProtection } from "./middleware/auth/authMiddleware";
-import uploadRoutes from "./routes/imports/upload.routes";
 import { startTransactionWorker } from "./workers/transaction.worker";
 
 dotenv.config({ path: `.env.${process.env.NODE_ENV || "local"}` });
@@ -60,6 +59,7 @@ app.get("/health", (_req, res) => {
      res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function mountValidationRoutes(
      app: express.Application,
      serviceName: string,

@@ -17,14 +17,7 @@ async function handleTransactionImport(job: Job<TransactionImportJobData>): Prom
           fileKey,
      });
 
-     await bulkUploadService.processJob(
-          jobId,
-          tenantId,
-          tenantType,
-          fileBucket,
-          fileKey,
-          mimeType,
-     );
+     await bulkUploadService.processJob(jobId, tenantId, tenantType, fileBucket, fileKey, mimeType);
 }
 
 export function startTransactionWorker(): Worker {

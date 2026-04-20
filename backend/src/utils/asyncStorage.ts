@@ -37,10 +37,7 @@ export const getTenantId = async () => {
  * BaseModel hooks (beforeCreate, beforeBulkCreate, etc.) can resolve
  * the tenant ID without an HTTP request.
  */
-export async function runWithTenantContext<T>(
-     tenantId: string,
-     fn: () => Promise<T>,
-): Promise<T> {
+export async function runWithTenantContext<T>(tenantId: string, fn: () => Promise<T>): Promise<T> {
      const store = new Map();
      (store as unknown as Record<string, string>).tenantId = tenantId;
      return asyncStorage.run(store, fn);
