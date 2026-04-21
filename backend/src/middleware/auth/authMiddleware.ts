@@ -16,6 +16,7 @@ interface AccessTokenPayload {
 
 interface AuthenticatedUser {
      userId: string;
+     name: string;
      email: string;
      tenantId: string;
      tenantType: "INDIVIDUAL" | "BUSINESS";
@@ -38,8 +39,14 @@ declare global {
 
 function extractBearerToken(req: Request): string | null {
      const header = req.headers.authorization;
-     if (!header || !header.startsWith("Bearer ")) return null;
-     return header.slice(7);
+     if (header && header.startsWith("Bearer ")) {
+          return header.slice(7);
+     }
+
+     const cookieToken = req.cookies?.accessToken as string | undefined;
+     if (cookieToken) return cookieToken;
+
+     return null;
 }
 
 export async function authMiddleware(
@@ -72,7 +79,7 @@ export async function authMiddleware(
           payload = jwt.verify(token, secret) as AccessTokenPayload;
      } catch (err) {
           const isExpired = err instanceof jwt.TokenExpiredError;
-          res.status(401).json({
+          res.status(403).json({
                status: "unauthorized",
                message: isExpired ? "Token expired" : "Invalid token",
           });
@@ -90,7 +97,7 @@ export async function authMiddleware(
      try {
           const userFindOptions: FindOptions = {
                where: { user_id: payload.userId },
-               attributes: ["user_id", "email", "tenant_id"],
+               attributes: ["user_id", "name", "email", "tenant_id"],
                hooks: false,
           };
 
@@ -123,6 +130,7 @@ export async function authMiddleware(
 
           req.user = {
                userId: user.user_id,
+               name: user.name,
                email: user.email,
                tenantId: user.tenant_id!,
                tenantType: payload.tenantType,
