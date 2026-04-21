@@ -44,7 +44,7 @@ initializeApp();
 eventService.registerHandlers();
 
 const limiter = rateLimit({
-     windowMs: 5 * 60 * 1000,
+     windowMs: 3 * 60 * 1000,
      max: 100,
      message: "Too many requests from this IP, please try again after 15 minutes",
 });
@@ -52,7 +52,15 @@ const limiter = rateLimit({
 const app = express();
 
 app.use(helmet());
-app.use(cors());
+app.use(
+     cors({
+          origin:
+               process.env.NODE_ENV === "production"
+                    ? process.env.NEXT_PUBLIC_API_URL
+                    : "http://localhost:3000",
+          credentials: true,
+     }),
+);
 app.use(limiter);
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));

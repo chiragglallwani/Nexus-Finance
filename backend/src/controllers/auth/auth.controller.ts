@@ -30,3 +30,17 @@ export async function logoutHandler(_req: Request, res: Response): Promise<void>
      const result = authService.logout(res);
      res.status(ApiResponseStatusToCodesMap[result.status]).json(result);
 }
+
+export async function meHandler(req: Request, res: Response): Promise<void> {
+     res.status(200).json({
+          status: "success",
+          message: "User fetched successfully",
+          data: {
+               userId: req.user.userId,
+               name: req.user.name,
+               email: req.user.email,
+               tenantId: req.user.tenantId,
+               tenantType: req.user.tenantType,
+          },
+     });
+}
