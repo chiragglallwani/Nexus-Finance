@@ -25,6 +25,7 @@ export function getTransactionImportQueue(): Queue {
 
 export interface TransactionImportJobData {
      jobId: string;
+     userId: string;
      tenantId: string;
      tenantType: "INDIVIDUAL" | "BUSINESS";
      fileBucket: string;

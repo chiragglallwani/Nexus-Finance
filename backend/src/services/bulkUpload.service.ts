@@ -8,7 +8,6 @@ import BusinessTransactions from "../database/models/BusinessTransactions";
 import Tenants from "../database/models/Tenants";
 import { runWithTenantContext } from "../utils/asyncStorage";
 import minioService from "./minio.service";
-import jobService from "./job.service";
 
 const BATCH_SIZE = 200;
 
@@ -17,6 +16,43 @@ interface RawRow {
 }
 
 class BulkUploadService {
+     private mapDebitCreditToTransactionType(
+          value: string | undefined,
+     ): "INFLOW" | "OUTFLOW" | null {
+          if (!value) return null;
+          const normalized = value.trim().toLowerCase();
+          if (normalized === "credit") return "INFLOW";
+          if (normalized === "debit") return "OUTFLOW";
+          return null;
+     }
+
+     private parseTransactionDate(value: string): Date {
+          const dateStr = value.trim();
+
+          const ddmmyyyy = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+          const ddmmyyyyMatch = ddmmyyyy.exec(dateStr);
+          if (ddmmyyyyMatch) {
+               const day = Number(ddmmyyyyMatch[1]);
+               const month = Number(ddmmyyyyMatch[2]);
+               const year = Number(ddmmyyyyMatch[3]);
+               const parsed = new Date(Date.UTC(year, month - 1, day));
+               if (
+                    parsed.getUTCFullYear() === year &&
+                    parsed.getUTCMonth() === month - 1 &&
+                    parsed.getUTCDate() === day
+               ) {
+                    return parsed;
+               }
+               throw new Error(`Invalid date value: ${value}`);
+          }
+
+          const parsed = new Date(dateStr);
+          if (Number.isNaN(parsed.getTime())) {
+               throw new Error(`Invalid date value: ${value}`);
+          }
+          return parsed;
+     }
+
      async processJob(
           jobId: string,
           tenantId: string,
@@ -24,15 +60,15 @@ class BulkUploadService {
           fileBucket: string,
           fileKey: string,
           mimeType: string,
+          userId: string,
      ): Promise<void> {
-          const jobResponse = await jobService.getJobById(jobId);
-          if (!jobResponse.data) {
+          const job = await runWithTenantContext(tenantId, () => Jobs.findByPk(jobId));
+          if (!job) {
                logger.error("Job not found", { jobId });
                throw new Error(`Job ${jobId} not found`);
           }
 
-          const alreadyProcessed =
-               (jobResponse.data as { processedRows?: number }).processedRows || 0;
+          const alreadyProcessed = job.processed_rows || 0;
 
           await runWithTenantContext(tenantId, async () => {
                await Jobs.update(
@@ -58,6 +94,7 @@ class BulkUploadService {
                          tenantId,
                          tenantType,
                          alreadyProcessed,
+                         userId,
                     );
                } else {
                     await this.processCsvStream(
@@ -66,6 +103,7 @@ class BulkUploadService {
                          tenantId,
                          tenantType,
                          alreadyProcessed,
+                         userId,
                     );
                }
 
@@ -89,7 +127,7 @@ class BulkUploadService {
                });
           } catch (error) {
                const message = error instanceof Error ? error.message : "Unknown error";
-               logger.error("Job failed", { jobId, error: message });
+               logger.error("Job failed", { jobId, error });
 
                await runWithTenantContext(tenantId, async () => {
                     await Jobs.update(
@@ -111,6 +149,7 @@ class BulkUploadService {
           tenantId: string,
           tenantType: "INDIVIDUAL" | "BUSINESS",
           skipRows: number,
+          userId: string,
      ): Promise<void> {
           const parser = stream.pipe(
                csvParse({
@@ -130,13 +169,13 @@ class BulkUploadService {
 
                batch.push(row as RawRow);
                if (batch.length >= BATCH_SIZE) {
-                    await this.flushBatch(batch, jobId, tenantId, tenantType);
+                    await this.flushBatch(batch, jobId, tenantId, tenantType, userId);
                     batch = [];
                }
           }
 
           if (batch.length > 0) {
-               await this.flushBatch(batch, jobId, tenantId, tenantType);
+               await this.flushBatch(batch, jobId, tenantId, tenantType, userId);
           }
      }
 
@@ -146,6 +185,7 @@ class BulkUploadService {
           tenantId: string,
           tenantType: "INDIVIDUAL" | "BUSINESS",
           skipRows: number,
+          userId: string,
      ): Promise<void> {
           const workbook = new ExcelJS.stream.xlsx.WorkbookReader(stream, {
                sharedStrings: "cache",
@@ -182,7 +222,7 @@ class BulkUploadService {
 
                     batch.push(parsed);
                     if (batch.length >= BATCH_SIZE) {
-                         await this.flushBatch(batch, jobId, tenantId, tenantType);
+                         await this.flushBatch(batch, jobId, tenantId, tenantType, userId);
                          batch = [];
                     }
                }
@@ -190,7 +230,7 @@ class BulkUploadService {
           }
 
           if (batch.length > 0) {
-               await this.flushBatch(batch, jobId, tenantId, tenantType);
+               await this.flushBatch(batch, jobId, tenantId, tenantType, userId);
           }
      }
 
@@ -199,6 +239,7 @@ class BulkUploadService {
           jobId: string,
           tenantId: string,
           tenantType: "INDIVIDUAL" | "BUSINESS",
+          userId: string,
      ): Promise<void> {
           let successCount = 0;
           const errors: JobErrorEntry[] = [];
@@ -239,7 +280,7 @@ class BulkUploadService {
                     const mapped = rows
                          .map((r, i) => {
                               try {
-                                   return this.mapBusinessRow(r, tenantId, taxRate);
+                                   return this.mapBusinessRow(r, tenantId, taxRate, userId);
                               } catch (e) {
                                    errors.push({
                                         row: i,
@@ -291,6 +332,11 @@ class BulkUploadService {
 
           const dateStr = row.date || row.transaction_date;
           if (!dateStr) throw new Error("Missing date");
+          const parsedDate = this.parseTransactionDate(dateStr);
+
+          const transactionType = this.mapDebitCreditToTransactionType(
+               row.transaction_type || row["transaction type"],
+          );
 
           return {
                tenant_id: tenantId,
@@ -300,8 +346,9 @@ class BulkUploadService {
                     .toLowerCase()
                     .replace(/[^a-z0-9 ]/g, ""),
                amount,
-               date: new Date(dateStr),
+               date: parsedDate,
                category: row.category || null,
+               transaction_type: transactionType,
                is_recurring: row.is_recurring === "true",
                prev_amount: row.prev_amount ? parseFloat(row.prev_amount) : null,
                vault_id: row.vault_id || null,
@@ -312,6 +359,7 @@ class BulkUploadService {
           row: RawRow,
           tenantId: string,
           taxRate: number,
+          userId: string,
      ): Record<string, unknown> {
           const merchantName = row.merchant_name || row.merchantname || row.merchant;
           if (!merchantName) throw new Error("Missing merchant_name");
@@ -321,17 +369,23 @@ class BulkUploadService {
 
           const dateStr = row.date || row.transaction_date;
           if (!dateStr) throw new Error("Missing date");
+          const parsedDate = this.parseTransactionDate(dateStr);
 
-          const isInflow = amount > 0;
+          const transactionType = this.mapDebitCreditToTransactionType(
+               row.transaction_type || row["transaction type"],
+          );
+
+          const isInflow = transactionType === "INFLOW";
           const taxReserved = isInflow && taxRate > 0 ? +(amount * taxRate).toFixed(2) : null;
 
           return {
                tenant_id: tenantId,
-               user_id: row.user_id,
+               user_id: userId,
                merchant_name: merchantName.trim(),
                amount,
-               date: new Date(dateStr),
+               date: parsedDate,
                category: row.category || null,
+               transaction_type: transactionType,
                account_source: row.account_source || null,
                tax_reserved: row.tax_reserved ? parseFloat(row.tax_reserved) : taxReserved,
                is_deductible: row.is_deductible === "true" || row.is_deductible === "1",

@@ -77,7 +77,7 @@ services:
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
       MINIO_ACCESS_KEY: nexus_minio
-      MINIO_SECRET_KEY: f8b90dcd8e8da8f064bbcffee34c4dba9498aab7a91fedeff50d1a8d406aaa1e
+      MINIO_SECRET_KEY: nexus_minio_secret
       MINIO_BUCKET: nexus-uploads
       MINIO_USE_SSL: "false"
       JWT_ACCESS_SECRET: 5a92c4d604f800f679ee9f44325045bddf13a601c4370d8e3cf23c8202dfe495

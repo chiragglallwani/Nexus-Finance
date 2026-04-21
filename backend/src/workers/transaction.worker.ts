@@ -7,7 +7,7 @@ import logger from "../config/logger";
 let transactionWorker: Worker | null = null;
 
 async function handleTransactionImport(job: Job<TransactionImportJobData>): Promise<void> {
-     const { jobId, tenantId, tenantType, fileBucket, fileKey, mimeType } = job.data;
+     const { jobId, tenantId, tenantType, fileBucket, fileKey, mimeType, userId } = job.data;
 
      logger.info("Worker picked up job", {
           bullmqJobId: job.id,
@@ -17,7 +17,15 @@ async function handleTransactionImport(job: Job<TransactionImportJobData>): Prom
           fileKey,
      });
 
-     await bulkUploadService.processJob(jobId, tenantId, tenantType, fileBucket, fileKey, mimeType);
+     await bulkUploadService.processJob(
+          jobId,
+          tenantId,
+          tenantType,
+          fileBucket,
+          fileKey,
+          mimeType,
+          userId,
+     );
 }
 
 export function startTransactionWorker(): Worker {

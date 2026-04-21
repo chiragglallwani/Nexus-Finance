@@ -5,11 +5,20 @@ import Tenants from "../database/models/Tenants";
 import minioService from "./minio.service";
 import jobService from "./job.service";
 import { getTransactionImportQueue, type TransactionImportJobData } from "../config/queue";
+import type { Readable } from "stream";
 
 const ALLOWED_MIME_TYPES = new Set([
+     // CSV variants
      "text/csv",
+     "application/csv",
+     "text/x-csv",
+     "text/plain",
+     "application/octet-stream",
+     // Excel variants
      "application/vnd.ms-excel",
      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+     "application/vnd.ms-excel.sheet.macroenabled.12",
+     "application/vnd.ms-excel.sheet.binary.macroenabled.12",
 ]);
 
 interface UploadFileInput {
@@ -18,7 +27,18 @@ interface UploadFileInput {
      mimetype: string;
 }
 
+interface TemplateDownloadData {
+     stream: Readable;
+     fileName: string;
+}
+
 class UploadService {
+     private isSupportedFileType(file: UploadFileInput): boolean {
+          if (ALLOWED_MIME_TYPES.has(file.mimetype)) return true;
+          const name = file.originalname.toLowerCase();
+          return name.endsWith(".csv") || name.endsWith(".xlsx") || name.endsWith(".xls");
+     }
+
      async uploadTransactions(
           file: UploadFileInput | undefined,
           tenantId: string,
@@ -31,10 +51,10 @@ class UploadService {
                };
           }
 
-          if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
+          if (!this.isSupportedFileType(file)) {
                return {
                     status: ApiResponseStatus.BAD_REQUEST,
-                    message: `Unsupported file type: ${file.mimetype}. Use CSV or XLSX.`,
+                    message: `Unsupported file type: ${file.mimetype}. Use CSV or XLS/XLSX.`,
                };
           }
 
@@ -83,6 +103,7 @@ class UploadService {
                          fileBucket: bucket,
                          fileKey: key,
                          mimeType: file.mimetype,
+                         userId,
                          originalName: file.originalname,
                     } satisfies TransactionImportJobData,
                     { jobId: job.job_id },
@@ -128,8 +149,31 @@ class UploadService {
           return jobService.getJobById(jobId);
      }
 
-     async listJobs(): Promise<ServiceResponse> {
-          return jobService.getRecentJobs();
+     async listJobs(limit = 50): Promise<ServiceResponse> {
+          return jobService.getRecentJobs(limit);
+     }
+
+     async getTemplateForTenant(
+          tenantType: "INDIVIDUAL" | "BUSINESS",
+     ): Promise<ServiceResponse<TemplateDownloadData>> {
+          try {
+               const { stream, fileName } = await minioService.getTemplateFileStream(tenantType);
+               return {
+                    status: ApiResponseStatus.SUCCESS,
+                    message: "Template fetched successfully",
+                    data: { stream, fileName },
+               };
+          } catch (error) {
+               logger.error("Template download failed", {
+                    error: error instanceof Error ? error.message : error,
+                    tenantType,
+               });
+               return {
+                    status: ApiResponseStatus.FAILURE,
+                    message: "Failed to fetch template",
+                    error: error instanceof Error ? error.message : "Internal server error",
+               };
+          }
      }
 }
 
