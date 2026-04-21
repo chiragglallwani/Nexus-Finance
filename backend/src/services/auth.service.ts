@@ -30,6 +30,13 @@ interface LoginInput {
      password: string;
 }
 
+interface RefreshTokenPayload {
+     userId: string;
+     tenantId: string;
+     iat: number;
+     exp: number;
+}
+
 interface TokenSet {
      accessToken: string;
      refreshToken: string;
@@ -178,6 +185,127 @@ class AuthService {
                     error: error instanceof Error ? error.message : "Internal server error",
                };
           }
+     }
+
+     async refreshSession(
+          refreshToken: string | undefined,
+          accessToken: string | undefined,
+          res: Response,
+     ): Promise<ServiceResponse> {
+          if (!refreshToken) {
+               return {
+                    status: ApiResponseStatus.UNAUTHORIZED,
+                    message: "Refresh token is required",
+               };
+          }
+
+          const accessSecret = process.env.JWT_ACCESS_SECRET;
+          const refreshSecret = process.env.JWT_REFRESH_SECRET;
+          if (!accessSecret || !refreshSecret) {
+               logger.error("JWT secrets are not configured");
+               return {
+                    status: ApiResponseStatus.FAILURE,
+                    message: "Server authentication misconfiguration",
+               };
+          }
+
+          if (accessToken) {
+               try {
+                    jwt.verify(accessToken, accessSecret);
+                    return {
+                         status: ApiResponseStatus.BAD_REQUEST,
+                         message: "Access token is still valid",
+                    };
+               } catch (error) {
+                    if (!(error instanceof jwt.TokenExpiredError)) {
+                         return {
+                              status: ApiResponseStatus.UNAUTHORIZED,
+                              message: "Invalid access token",
+                         };
+                    }
+               }
+          }
+
+          let refreshPayload: RefreshTokenPayload;
+          try {
+               refreshPayload = jwt.verify(refreshToken, refreshSecret) as RefreshTokenPayload;
+          } catch {
+               return {
+                    status: ApiResponseStatus.UNAUTHORIZED,
+                    message: "Invalid or expired refresh token",
+               };
+          }
+
+          try {
+               const user = await Users.findOne({
+                    where: { user_id: refreshPayload.userId },
+                    attributes: ["user_id", "email", "tenant_id"],
+                    hooks: false,
+               });
+               if (!user || user.tenant_id !== refreshPayload.tenantId) {
+                    return {
+                         status: ApiResponseStatus.FORBIDDEN,
+                         message: "Access denied",
+                    };
+               }
+
+               const tenant = await Tenants.findOne({
+                    where: { tenant_id: user.tenant_id },
+                    attributes: ["tenant_id", "type"],
+               });
+               if (!tenant) {
+                    return {
+                         status: ApiResponseStatus.NOT_FOUND,
+                         message: "Tenant not found",
+                    };
+               }
+
+               const tokens = this.generateTokens(
+                    user.user_id,
+                    user.tenant_id!,
+                    user.email,
+                    tenant.type as TenantType,
+               );
+               this.setAuthCookiesAndHeaders(res, tokens);
+
+               return {
+                    status: ApiResponseStatus.SUCCESS,
+                    message: "Session refreshed successfully",
+               };
+          } catch (error) {
+               logger.error("Refresh session failed", {
+                    error: error instanceof Error ? error.message : error,
+               });
+               return {
+                    status: ApiResponseStatus.FAILURE,
+                    message: "Failed to refresh session",
+                    error: error instanceof Error ? error.message : "Internal server error",
+               };
+          }
+     }
+
+     logout(res: Response): ServiceResponse {
+          const cookieOptions = {
+               httpOnly: true as const,
+               secure: IS_PRODUCTION,
+               sameSite: "strict" as const,
+          };
+
+          res.clearCookie("accessToken", cookieOptions);
+          res.clearCookie("refreshToken", cookieOptions);
+          res.clearCookie("csrfToken", {
+               httpOnly: false,
+               secure: IS_PRODUCTION,
+               sameSite: "strict",
+          });
+
+          res.removeHeader("Authorization");
+          res.removeHeader("x-csrf-token");
+
+          return {
+               status: ApiResponseStatus.SUCCESS,
+               message: "Logged out successfully",
+          };
      }
 
      private setAuthCookiesAndHeaders(res: Response, tokens: TokenSet): void {

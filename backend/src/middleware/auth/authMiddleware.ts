@@ -1,5 +1,6 @@
 import { type Request, type Response, type NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { type FindOptions } from "sequelize";
 import logger from "../../config/logger";
 import { setAsyncStorage } from "../../utils/asyncStorage";
 import Users from "../../database/models/Users";
@@ -18,6 +19,12 @@ interface AuthenticatedUser {
      email: string;
      tenantId: string;
      tenantType: "INDIVIDUAL" | "BUSINESS";
+}
+
+declare module "sequelize" {
+     interface FindOptions {
+          hooks?: boolean;
+     }
 }
 
 declare global {
@@ -81,15 +88,31 @@ export async function authMiddleware(
      }
 
      try {
-          const user = await Users.findOne({
+          const userFindOptions: FindOptions = {
                where: { user_id: payload.userId },
                attributes: ["user_id", "email", "tenant_id"],
-          });
+               hooks: false,
+          };
+
+          const user = await Users.findOne(userFindOptions);
 
           if (!user) {
                logger.warn("JWT references non-existent user", {
                     userId: payload.userId,
                     tenantId: payload.tenantId,
+               });
+               res.status(403).json({
+                    status: "forbidden",
+                    message: "Access denied",
+               });
+               return;
+          }
+
+          if (user.tenant_id !== payload.tenantId) {
+               logger.warn("JWT tenant mismatch", {
+                    userId: payload.userId,
+                    tokenTenantId: payload.tenantId,
+                    userTenantId: user.tenant_id,
                });
                res.status(403).json({
                     status: "forbidden",
@@ -112,6 +135,7 @@ export async function authMiddleware(
           logger.error("Auth middleware failed", {
                error: error instanceof Error ? error.message : error,
                userId: payload.userId,
+               tenantId: payload.tenantId,
           });
           res.status(500).json({
                status: "failure",
