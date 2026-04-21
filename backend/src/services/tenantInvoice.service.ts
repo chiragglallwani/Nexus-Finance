@@ -23,8 +23,7 @@ interface ListInvoicesInput {
 class TenantInvoiceService {
      async listInvoices(input: ListInvoicesInput): Promise<ServiceResponse> {
           const page = input.page > 0 ? input.page : DEFAULT_PAGE;
-          const limit =
-               input.limit > 0 && input.limit <= 100 ? input.limit : DEFAULT_LIMIT;
+          const limit = input.limit > 0 && input.limit <= 100 ? input.limit : DEFAULT_LIMIT;
           const offset = (page - 1) * limit;
 
           try {
@@ -73,15 +72,8 @@ class TenantInvoiceService {
      }
 
      async createInvoice(input: CreateInvoiceInput): Promise<ServiceResponse> {
-          const {
-               userId,
-               name,
-               sentDate,
-               dueDate,
-               actualPaidDate,
-               status,
-               transactionNameMapper,
-          } = input;
+          const { userId, name, sentDate, dueDate, actualPaidDate, status, transactionNameMapper } =
+               input;
 
           try {
                const invoice = await TenantInvoices.create({
