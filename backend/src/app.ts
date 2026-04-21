@@ -13,6 +13,7 @@ import { requestLogger } from "./middleware/logging/requestLogger";
 import { authMiddleware, csrfProtection } from "./middleware/auth/authMiddleware";
 import { startTransactionWorker } from "./workers/transaction.worker";
 import authRoutes from "./routes/auth/auth.route";
+import vaultRoutes from "./routes/vaults/vault.route";
 
 dotenv.config({ path: `.env.${process.env.NODE_ENV || "local"}` });
 
@@ -62,14 +63,15 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/v1/auth", authRoutes);
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function mountValidationRoutes(
+function mountProtectedRoutes(
      app: express.Application,
      serviceName: string,
      router: RequestHandler,
 ) {
      app.use(`/api/v1/${serviceName}`, csrfProtection, authMiddleware, router);
 }
+
+mountProtectedRoutes(app, "vaults", vaultRoutes);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
