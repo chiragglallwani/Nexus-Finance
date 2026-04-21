@@ -24,6 +24,6 @@ router.post("/transactions", upload.single("file"), uploadTransactions);
 router.get("/jobs/:jobId", getUploadStatusValidator, validate, getUploadStatus);
 
 router.get("/jobs", listUploadJobsValidator, validate, listJobs);
-router.get("/template/download", downloadUploadTemplate);
+router.get("/template/download", validate, downloadUploadTemplate);
 
 export default router;

@@ -58,11 +58,8 @@ class MinioService {
                     ? "individual_uploads_template"
                     : "business_uploads_template";
 
-          const candidateKeys = [
-               `tenant/${baseName}`,
-               `tenant/${baseName}.csv`,
-               `tenant/${baseName}.xlsx`,
-          ];
+          // Prefer XLSX so downloads open in Excel; CSV is fallback only.
+          const candidateKeys = [`templates/${baseName}.xlsx`, `templates/${baseName}.csv`];
 
           for (const key of candidateKeys) {
                try {

@@ -7,6 +7,21 @@ export const api = axios.create({
   withCredentials: true, // Required for HttpOnly Cookies
 })
 
+export const getCookieValue = (key: string): string | null => {
+  if (typeof document === 'undefined') return null
+  const cookies = document.cookie ? document.cookie.split('; ') : []
+  const match = cookies.find((cookie) => cookie.startsWith(`${key}=`))
+  return match ? decodeURIComponent(match.split('=').slice(1).join('=')) : null
+}
+
+api.interceptors.request.use((config) => {
+  const csrfToken = getCookieValue('csrfToken')
+  if (csrfToken) {
+    config.headers.set('x-csrf-token', csrfToken)
+  }
+  return config
+})
+
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error) => {
