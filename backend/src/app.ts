@@ -14,6 +14,7 @@ import { authMiddleware, csrfProtection } from "./middleware/auth/authMiddleware
 import { startTransactionWorker } from "./workers/transaction.worker";
 import authRoutes from "./routes/auth/auth.route";
 import vaultRoutes from "./routes/vaults/vault.route";
+import tenantBalanceRoutes from "./routes/tenantBalance/tenantBalance.route";
 
 dotenv.config({ path: `.env.${process.env.NODE_ENV || "local"}` });
 
@@ -72,6 +73,7 @@ function mountProtectedRoutes(
 }
 
 mountProtectedRoutes(app, "vaults", vaultRoutes);
+mountProtectedRoutes(app, "balance", tenantBalanceRoutes);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
