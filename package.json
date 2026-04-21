@@ -1,6 +1,0 @@
-{
-  "devDependencies": {
-    "@types/cookie-parser": "^1.4.10",
-    "prettier": "^3.8.3"
-  }
-}
