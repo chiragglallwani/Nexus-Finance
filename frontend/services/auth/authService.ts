@@ -1,22 +1,7 @@
 import { api } from '@/lib/axios'
 import { Routes } from '@/utils/routes'
 import { APIResponse, LoginForm, SignupForm, UserInfo } from '@/models/types'
-import { AxiosError } from 'axios'
-
-const defaultErrorResponse: APIResponse<void> = {
-  status: 'failure',
-  message: 'Something went wrong',
-}
-
-const normalizeAxiosError = (error: unknown): APIResponse<void> => {
-  if (error instanceof AxiosError) {
-    const responseData = error.response?.data as APIResponse<void> | undefined
-    if (responseData?.status && responseData?.message) {
-      return responseData
-    }
-  }
-  return defaultErrorResponse
-}
+import { normalizeAxiosError } from '@/utils/errors'
 
 export const login = async (form: LoginForm) => {
   try {

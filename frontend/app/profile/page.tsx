@@ -1,6 +1,6 @@
 import ProfileMain from '@/features/profile/ProfileMain'
 
-function ProfilePage() {
+async function ProfilePage() {
   return <ProfileMain />
 }
 

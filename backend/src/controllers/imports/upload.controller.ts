@@ -2,6 +2,17 @@ import { type Request, type Response } from "express";
 import { ApiResponseStatusToCodesMap } from "../../constants/apiResponse";
 import uploadService from "../../services/upload.service";
 
+function contentTypeForTemplateFileName(fileName: string): string {
+     const lower = fileName.toLowerCase();
+     if (lower.endsWith(".xlsx")) {
+          return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+     }
+     if (lower.endsWith(".csv")) {
+          return "text/csv; charset=utf-8";
+     }
+     return "application/octet-stream";
+}
+
 export async function uploadTransactions(req: Request, res: Response): Promise<void> {
      const { tenantId, userId } = req.user;
      const result = await uploadService.uploadTransactions(req.file, tenantId, userId);
@@ -31,6 +42,6 @@ export async function downloadUploadTemplate(req: Request, res: Response): Promi
 
      const fileName = result.data.fileName;
      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
-     res.setHeader("Content-Type", "application/octet-stream");
+     res.setHeader("Content-Type", contentTypeForTemplateFileName(fileName));
      result.data.stream.pipe(res);
 }

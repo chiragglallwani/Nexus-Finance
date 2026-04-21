@@ -17,6 +17,7 @@ import vaultRoutes from "./routes/vaults/vault.route";
 import tenantBalanceRoutes from "./routes/tenantBalance/tenantBalance.route";
 import tenantInvoiceRoutes from "./routes/tenantInvoices/tenantInvoice.route";
 import uploadRoutes from "./routes/imports/upload.routes";
+import userRoutes from "./routes/user/user.route";
 
 dotenv.config({ path: `.env.${process.env.NODE_ENV || "local"}` });
 
@@ -59,6 +60,7 @@ app.use(
                     ? process.env.NEXT_PUBLIC_API_URL
                     : "http://localhost:3000",
           credentials: true,
+          exposedHeaders: ["Content-Disposition", "Content-Type"],
      }),
 );
 app.use(limiter);
@@ -86,6 +88,7 @@ mountProtectedRoutes(app, "vaults", vaultRoutes);
 mountProtectedRoutes(app, "balance", tenantBalanceRoutes);
 mountProtectedRoutes(app, "invoices", tenantInvoiceRoutes);
 mountProtectedRoutes(app, "uploads", uploadRoutes);
+mountProtectedRoutes(app, "user", userRoutes);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
