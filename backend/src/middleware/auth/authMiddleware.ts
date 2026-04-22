@@ -132,7 +132,7 @@ export async function authMiddleware(
                userId: user.user_id,
                name: user.name,
                email: user.email,
-               tenantId: user.tenant_id!,
+               tenantId: payload.tenantId,
                tenantType: payload.tenantType,
           };
 

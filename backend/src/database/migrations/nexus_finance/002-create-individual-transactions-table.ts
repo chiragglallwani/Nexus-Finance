@@ -53,7 +53,7 @@ export const up = async ({ context: queryInterface }: { context: QueryInterface 
                     allowNull: true,
                },
                price_creep_pct: {
-                    type: DataTypes.DECIMAL(5, 2),
+                    type: DataTypes.DECIMAL(10, 2),
                     allowNull: true,
                },
                future_value: {

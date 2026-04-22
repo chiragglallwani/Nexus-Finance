@@ -8,6 +8,7 @@ import BusinessTransactions from "../database/models/BusinessTransactions";
 import Tenants from "../database/models/Tenants";
 import { runWithTenantContext } from "../utils/asyncStorage";
 import minioService from "./minio.service";
+import { Op } from "sequelize";
 
 const BATCH_SIZE = 200;
 
@@ -26,27 +27,30 @@ class BulkUploadService {
           return null;
      }
 
-     private parseTransactionDate(value: string): Date {
-          const dateStr = value.trim();
+     private parseTransactionDate(value: string | number): Date {
+          const strValue = String(value).trim();
 
+          // 1. Handle Excel Serial Dates (e.g., "45962")
+          if (!isNaN(Number(strValue)) && !strValue.includes("/") && !strValue.includes("-")) {
+               const serial = Number(strValue);
+               // Excel incorrectly assumes 1900 was a leap year, so we adjust by 25569 (days between 1900 and 1970)
+               // and subtract 2 for the Excel leap year bug.
+               const date = new Date(Date.UTC(1899, 11, 30 + serial));
+               return date;
+          }
+
+          // 2. Handle DD/MM/YYYY strings
           const ddmmyyyy = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-          const ddmmyyyyMatch = ddmmyyyy.exec(dateStr);
+          const ddmmyyyyMatch = ddmmyyyy.exec(strValue);
           if (ddmmyyyyMatch) {
                const day = Number(ddmmyyyyMatch[1]);
                const month = Number(ddmmyyyyMatch[2]);
                const year = Number(ddmmyyyyMatch[3]);
-               const parsed = new Date(Date.UTC(year, month - 1, day));
-               if (
-                    parsed.getUTCFullYear() === year &&
-                    parsed.getUTCMonth() === month - 1 &&
-                    parsed.getUTCDate() === day
-               ) {
-                    return parsed;
-               }
-               throw new Error(`Invalid date value: ${value}`);
+               return new Date(Date.UTC(year, month - 1, day));
           }
 
-          const parsed = new Date(dateStr);
+          // 3. Fallback to standard JS parsing
+          const parsed = new Date(strValue);
           if (Number.isNaN(parsed.getTime())) {
                throw new Error(`Invalid date value: ${value}`);
           }
@@ -196,7 +200,6 @@ class BulkUploadService {
           let headers: string[] = [];
           let batch: RawRow[] = [];
           let rowIndex = 0;
-
           for await (const worksheet of workbook) {
                for await (const row of worksheet) {
                     if (row.number === 1) {
@@ -228,7 +231,7 @@ class BulkUploadService {
                }
                break;
           }
-
+          logger.info("Batch", { batch, tenantType });
           if (batch.length > 0) {
                await this.flushBatch(batch, jobId, tenantId, tenantType, userId);
           }
@@ -249,9 +252,12 @@ class BulkUploadService {
                     where: { tenant_id: tenantId },
                     attributes: ["tenant_id", "tax_rate"],
                });
+               const sanitizedRows = await this.sanitizeRows(rows, tenantType);
+
+               logger.info("Sanitized rows", { sanitizedRows });
 
                if (tenantType === "INDIVIDUAL") {
-                    const mapped = rows
+                    const mapped = sanitizedRows
                          .map((r, i) => {
                               try {
                                    return this.mapIndividualRow(r, tenantId);
@@ -350,6 +356,7 @@ class BulkUploadService {
                category: row.category || null,
                transaction_type: transactionType,
                is_recurring: row.is_recurring === "true",
+               price_creep_pct: row.price_creep_pct ? parseFloat(row.price_creep_pct) : null,
                prev_amount: row.prev_amount ? parseFloat(row.prev_amount) : null,
                vault_id: row.vault_id || null,
           };
@@ -393,6 +400,129 @@ class BulkUploadService {
                tenant_invoices_id: row.tenant_invoices_id || row.invoice_id || null,
                days_to_pay: row.days_to_pay ? parseInt(row.days_to_pay) : null,
           };
+     }
+
+     private getPreviousCalendarMonthBoundsUTC(date: Date): { start: Date; end: Date } {
+          // 1. Create a copy to avoid mutating the original date object
+          const startOfCurrentMonth = new Date(
+               Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1, 0, 0, 0, 0),
+          );
+
+          // 2. Subtract one month to get the start of the previous month
+          const startOfPreviousMonth = new Date(startOfCurrentMonth);
+          startOfPreviousMonth.setUTCMonth(startOfPreviousMonth.getUTCMonth() - 1);
+
+          // 3. The end of the previous month is exactly 1 millisecond before the start of the current month
+          const endOfPreviousMonth = new Date(startOfCurrentMonth.getTime() - 1);
+
+          return {
+               start: startOfPreviousMonth,
+               end: endOfPreviousMonth,
+          };
+     }
+
+     private async sanitizeRows(
+          rows: RawRow[],
+          tenantType: "INDIVIDUAL" | "BUSINESS",
+     ): Promise<RawRow[]> {
+          // Only perform recurring logic for Individuals
+          if (tenantType !== "INDIVIDUAL") {
+               return rows;
+          }
+
+          return Promise.all(
+               rows.map(async (row, index) => {
+                    // Create a copy to avoid mutating the original array mid-stream
+                    const copyRow = { ...row };
+                    logger.info("Copy row", { copyRow });
+
+                    const rawDate = row.date || row.transaction_date;
+                    const merchantName = (row.merchant_name || row.merchantname || "")
+                         .trim()
+                         .toLowerCase();
+                    const category = (row.category || "").trim().toLowerCase();
+                    const txType = (row.transaction_type || "").trim().toUpperCase(); // Expecting "OUTFLOW"
+                    const currentAmount = parseFloat(row.amount || "0");
+
+                    // 1. Guard Clause: Only process if we have a date, it's an OUTFLOW, and not an investment
+                    if (!rawDate || txType !== "DEBIT" || category === "Investment") {
+                         return copyRow;
+                    }
+
+                    let currentDateObject: Date;
+                    try {
+                         currentDateObject = this.parseTransactionDate(rawDate);
+                    } catch {
+                         return copyRow; // Skip if date is unparseable
+                    }
+
+                    // 2. Define the Previous Month Window
+                    const { start: startPrev, end: endPrev } =
+                         this.getPreviousCalendarMonthBoundsUTC(currentDateObject);
+
+                    /**
+                     * TIER 1: Check the current batch (In-Memory)
+                     * This handles cases where a user uploads multiple months in one file.
+                     */
+                    const previousInArray = rows.find((r, idx) => {
+                         if (idx === index || !r.date) return false;
+
+                         let rDate: Date;
+                         try {
+                              rDate = this.parseTransactionDate(r.date);
+                         } catch {
+                              return false;
+                         }
+
+                         return (
+                              (r.merchant_name || r.merchantname || "").trim().toLowerCase() ===
+                                   merchantName &&
+                              (r.category || "").trim().toLowerCase() === category &&
+                              (r.transaction_type || "").trim().toUpperCase() === "DEBIT" &&
+                              rDate >= startPrev &&
+                              rDate <= endPrev
+                         );
+                    });
+
+                    let previousMatch = previousInArray
+                         ? { amount: parseFloat(previousInArray.amount || "0") }
+                         : null;
+
+                    /**
+                     * TIER 2: Check the Database
+                     * Only runs if Tier 1 found nothing.
+                     */
+                    if (!previousMatch) {
+                         const dbMatch = await IndividualTransactions.findOne({
+                              where: {
+                                   merchant_name: merchantName,
+                                   category: category,
+                                   transaction_type: "OUTFLOW",
+                                   date: { [Op.between]: [startPrev, endPrev] },
+                              },
+                         });
+
+                         if (dbMatch) {
+                              previousMatch = { amount: dbMatch.amount };
+                         }
+                    }
+
+                    // 3. If a match was found in either Tier, enrich the row
+                    if (previousMatch) {
+                         copyRow.is_recurring = "true";
+                         const prevAmount = previousMatch.amount;
+
+                         // Price Creep logic: only if the price actually went up
+                         if (currentAmount > prevAmount && prevAmount > 0) {
+                              copyRow.prev_amount = prevAmount.toString();
+                              const pct = ((currentAmount - prevAmount) / prevAmount) * 100;
+                              copyRow.price_creep_pct = pct.toFixed(2);
+                         }
+                    }
+
+                    return copyRow;
+               }),
+          );
      }
 }
 

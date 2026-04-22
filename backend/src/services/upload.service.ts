@@ -6,6 +6,7 @@ import minioService from "./minio.service";
 import jobService from "./job.service";
 import { getTransactionImportQueue, type TransactionImportJobData } from "../config/queue";
 import type { Readable } from "stream";
+import { runWithTenantContext } from "../utils/asyncStorage";
 
 const ALLOWED_MIME_TYPES = new Set([
      // CSV variants
@@ -59,10 +60,12 @@ class UploadService {
           }
 
           try {
-               const tenant = await Tenants.findOne({
-                    where: { tenant_id: tenantId },
-                    attributes: ["tenant_id", "type"],
-               });
+               const tenant = await runWithTenantContext(tenantId, () =>
+                    Tenants.findOne({
+                         where: { tenant_id: tenantId },
+                         attributes: ["tenant_id", "type"],
+                    }),
+               );
                if (!tenant) {
                     return {
                          status: ApiResponseStatus.NOT_FOUND,
@@ -78,20 +81,22 @@ class UploadService {
                     tenantId,
                );
 
-               const job = await Jobs.create({
-                    tenant_id: tenantId,
-                    user_id: userId,
-                    type: JobType.TRANSACTION_IMPORT,
-                    status: JobStatus.QUEUED,
-                    file_bucket: bucket,
-                    file_key: key,
-                    file_original_name: file.originalname,
-                    file_mime_type: file.mimetype,
-                    file_size_bytes: size,
-                    processed_rows: 0,
-                    failed_rows: 0,
-                    metadata: { tenantType, batchSize: 200 },
-               });
+               const job = await runWithTenantContext(tenantId, () =>
+                    Jobs.create({
+                         tenant_id: tenantId,
+                         user_id: userId,
+                         type: JobType.TRANSACTION_IMPORT,
+                         status: JobStatus.QUEUED,
+                         file_bucket: bucket,
+                         file_key: key,
+                         file_original_name: file.originalname,
+                         file_mime_type: file.mimetype,
+                         file_size_bytes: size,
+                         processed_rows: 0,
+                         failed_rows: 0,
+                         metadata: { tenantType, batchSize: 200 },
+                    }),
+               );
 
                const queue = getTransactionImportQueue();
                const bullmqJob = await queue.add(
@@ -109,11 +114,9 @@ class UploadService {
                     { jobId: job.job_id },
                );
 
-               await Jobs.update(
-                    { bullmq_job_id: bullmqJob.id },
-                    { where: { job_id: job.job_id } },
+               await runWithTenantContext(tenantId, () =>
+                    Jobs.update({ bullmq_job_id: bullmqJob.id }, { where: { job_id: job.job_id } }),
                );
-
                logger.info("Upload accepted", {
                     jobId: job.job_id,
                     tenantId,
