@@ -56,7 +56,7 @@ export function Sidebar({
       )}
       <aside
         className={cn(
-          'border-outline-variant/20 fixed top-0 left-0 z-50 h-full w-60 border-r bg-slate-900/40 p-4 transition-transform duration-200 md:static md:z-auto md:h-[calc(100vh-4rem)]',
+          'border-outline-variant/20 fixed top-16 left-0 z-50 h-[calc(100vh-4rem)] w-60 border-r bg-slate-900/40 p-4 transition-transform duration-200 md:static md:z-auto md:h-[calc(100vh-4rem)]',
           open ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
           className
         )}

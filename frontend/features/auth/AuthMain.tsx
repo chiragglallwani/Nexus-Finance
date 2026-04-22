@@ -70,8 +70,17 @@ function AuthMain() {
       })
       if (response.status === 'success') {
         toast.success(response.message || 'Login successful')
-        router.push('/profile')
-        refreshUser()
+        await refreshUser()
+        router.replace('/profile')
+        router.refresh()
+        // Fallback for rare client-router stalls after auth state changes.
+        if (typeof window !== 'undefined') {
+          window.setTimeout(() => {
+            if (window.location.pathname.startsWith('/auth')) {
+              window.location.assign('/profile')
+            }
+          }, 120)
+        }
       } else {
         toast.error(response.message || 'Login failed')
       }
