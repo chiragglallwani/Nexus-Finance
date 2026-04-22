@@ -18,6 +18,7 @@ import tenantBalanceRoutes from "./routes/tenantBalance/tenantBalance.route";
 import tenantInvoiceRoutes from "./routes/tenantInvoices/tenantInvoice.route";
 import uploadRoutes from "./routes/imports/upload.routes";
 import userRoutes from "./routes/user/user.route";
+import featuresRoutes from "./routes/features/features.route";
 
 dotenv.config({ path: `.env.${process.env.NODE_ENV || "local"}` });
 
@@ -89,6 +90,7 @@ mountProtectedRoutes(app, "balance", tenantBalanceRoutes);
 mountProtectedRoutes(app, "invoices", tenantInvoiceRoutes);
 mountProtectedRoutes(app, "uploads", uploadRoutes);
 mountProtectedRoutes(app, "user", userRoutes);
+mountProtectedRoutes(app, "features", featuresRoutes);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
