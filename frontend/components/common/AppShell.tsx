@@ -24,11 +24,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen>
-      <div className="bg-background min-h-screen">
+      <div className="bg-background h-screen overflow-hidden">
         <AppHeader />
-        <div className="flex">
+        <div className="flex h-[calc(100vh-0.5rem)] pt-16">
           <AppSidebar user={user} />
-          <SidebarInset>{children}</SidebarInset>
+          <SidebarInset className="h-full overflow-y-auto">
+            {children}
+          </SidebarInset>
         </div>
       </div>
     </SidebarProvider>
